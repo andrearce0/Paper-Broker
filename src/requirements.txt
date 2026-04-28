@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
+pydantic
+pydantic-settings
+email-validator
+bcrypt
+PyJWT
+python-multipart
+fpdf2
+yfinance
+boto3
