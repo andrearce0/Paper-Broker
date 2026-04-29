@@ -26,7 +26,7 @@ export default function Login({ onLoginSuccess, onNavigateToRegister }: LoginPro
       formData.append('username', email); 
       formData.append('password', password);
 
-      const response = await fetch('http://localhost:8000/login', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',

@@ -46,9 +46,9 @@ export default function Dashboard({onLogout}: DashboardProps) {
     
     try {
       const [summaryRes, perfRes, statementRes] = await Promise.all([
-        fetch('http://localhost:8000/portfolio/summary', { headers }),
-        fetch('http://localhost:8000/portfolio/performance', { headers }),
-        fetch('http://localhost:8000/transactions/me', { headers })
+        fetch(`${import.meta.env.VITE_API_URL}/portfolio/summary`, { headers }),
+        fetch(`${import.meta.env.VITE_API_URL}/portfolio/performance`, { headers }),
+        fetch(`${import.meta.env.VITE_API_URL}/transactions/me`, { headers })
       ]);
 
       if (summaryRes.ok && perfRes.ok && statementRes.ok) {
