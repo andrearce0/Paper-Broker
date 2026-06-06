@@ -164,13 +164,36 @@ def authenticate_and_generate_token(db: Session, email: str, password: str):
     return {"access_token": access_token, "token_type": "bearer"}
 
 def create_transaction(db: Session, transaction: schemas.TransactionCreate, current_user: models.User):
-    asset = crud.get_asset(db, asset_id=transaction.asset_id)
-    if not asset:
-        raise HTTPException(status_code=404, detail="Ação não encontrada")
+    ticker_upper = transaction.ticker.upper().strip()
     
-    if transaction.type == models.TransactionType.SELL:
-        validate_sell_operation(db, user_id=current_user.id, asset_id=transaction.asset_id, quantity_to_sell=transaction.quantity)
+    # 1. Busca o ativo pelo ticker (Substitui o antigo crud.get_asset via id)
+    asset = db.query(models.Asset).filter(models.Asset.ticker == ticker_upper).first()
+    
+    # 2. Se o ativo não existir no banco, cadastra ele silenciosamente na hora
+    if not asset:
+        corporation_name = ticker_upper
 
+        try:
+            asset_info = yf.Ticker(ticker_upper).info
+            corporation_name = asset_info.get("shortName") or asset_info.get("longName") or ticker_upper
+        except Exception as e:
+            logger.warning(f"Não foi possível obter informações do ativo {ticker_upper} via Yahoo Finance. Usando ticker como nome.")
+            
+        asset = models.Asset(ticker=ticker_upper, name=ticker_upper, asset_type="Ação") # Nome fica igual ao ticker como fallback
+        db.add(asset)
+        db.commit()
+        db.refresh(asset)
+    
+    # 3. Validação de VENDA usando o asset.id que acabamos de garantir
+    if transaction.type == models.TransactionType.SELL:
+        validate_sell_operation(
+            db, 
+            user_id=current_user.id, 
+            asset_id=asset.id, 
+            quantity_to_sell=transaction.quantity
+        )
+
+    # 4. Validação de Preço contra o Yahoo Finance (Mantida intacta)
     try:
         market_price = fetch_current_market_price(asset.ticker)
         
@@ -193,7 +216,13 @@ def create_transaction(db: Session, transaction: schemas.TransactionCreate, curr
             detail="Serviço de cotação temporariamente indisponível. Tente novamente."
         )
 
-    new_transaction = crud.create_transaction(db=db, transaction=transaction, user_id=current_user.id)
+    # 5. Salva a transação passando o asset_id explicitamente para o CRUD
+    new_transaction = crud.create_transaction(
+        db=db, 
+        transaction=transaction, 
+        user_id=current_user.id, 
+        asset_id=asset.id # <-- Passamos o ID gerado/resgatado aqui!
+    )
     db.commit()
     db.refresh(new_transaction)
     

@@ -43,17 +43,17 @@ def get_assets(db: Session, skip: int = 0, limit: int = 100):
 def get_asset(db: Session, asset_id: int):
     return db.query(models.Asset).filter(models.Asset.id == asset_id).first()
 
-def create_transaction(db: Session, transaction: schemas.TransactionCreate, user_id: int):
+def create_transaction(db: Session, transaction: schemas.TransactionCreate, user_id: int, asset_id: int):
     db_transaction = models.Transaction(
-        user_id=user_id,
-        asset_id=transaction.asset_id,
+        asset_id=asset_id, # Recebe o ID que extraímos lá no controller
         type=transaction.type,
         quantity=transaction.quantity,
         price=transaction.price,
+        user_id=user_id
     )
     db.add(db_transaction)
-    db.flush()
-    
+    db.commit()
+    db.refresh(db_transaction)
     return db_transaction
 
 def get_transactions_by_user(

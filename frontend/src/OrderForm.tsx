@@ -1,80 +1,65 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import api from './services/api';
 
-interface Asset {
-  id: number;
-  ticker: string;
-  name: string;
-}
-
 export default function OrderForm({ onOrderSuccess }: { onOrderSuccess: () => void }) {
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [assetId, setAssetId] = useState('');
+  const [ticker, setTicker] = useState('');
   const [type, setType] = useState<'compra' | 'venda'>('compra');
   const [quantity, setQuantity] = useState('');
   const [price, setPrice] = useState('');
   const [loading, setLoading] = useState(false);
+  const [searchingPrice, setSearchingPrice] = useState(false);
 
-  // Busca os ativos para o Dropdown
-  useEffect(() => {
-    const fetchAssets = async () => {
-  try {
-    const response = await api.get('/assets/');
-    setAssets(response.data);
-  } catch (error) {
-    console.error("Erro ao carregar ativos", error);
-  }
-  };
-    fetchAssets();
-  }, []);
-
-  useEffect(() => {
-  const fetchPrice = async () => {
-    if (!assetId) return; 
-
-    const selectedAsset = assets.find(a => a.id.toString() === assetId);
-    if (!selectedAsset) return;
-
+  const handleSearchPrice = async () => {
+    if (!ticker) return;
+    
+    setSearchingPrice(true);
+    setPrice('Buscando...');
+    
     try {
-      setPrice('Buscando...'); 
+      const response = await api.get(`/assets/${ticker.toUpperCase()}/price`);
       
-      const response = await api.get(`/assets/${selectedAsset.ticker}/price`);
-      
-      setPrice(response.data.price.toString()); 
+      setPrice(response.data.price.toString());
       
     } catch (error) {
       console.error("Erro ao buscar cotação:", error);
+      alert("Ativo não encontrado no Yahoo Finance. Verifique o código (ex: PETR4.SA)");
       setPrice('');
+    } finally {
+      setSearchingPrice(false);
     }
   };
 
-  fetchPrice();
-}, [assetId, assets]);
-
   const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
+  
+  if (!price || isNaN(parseFloat(price))) {
+    alert("Por favor, busque a cotação do ativo antes de executar a ordem.");
+    return;
+  }
+
   setLoading(true);
 
   try {
+    const typeToSend = type === 'compra' ? 'BUY' : 'SELL'; 
+
+    // Ajuste feito na linha do 'type'
     await api.post('/transactions/', {
-      asset_id: parseInt(assetId),
-      type: type,
+      ticker: ticker.toUpperCase(),
+      type: typeToSend,
       quantity: parseFloat(quantity),
       price: parseFloat(price)
     });
 
-
     alert("Ordem executada com sucesso!");
     
-    setAssetId(''); 
+    setTicker(''); 
     setQuantity('');
     setPrice('');
-    setType('compra'); 
+    setType('compra');
     onOrderSuccess(); 
 
   } catch (error: any) {
     console.error("Erro na transação:", error);
-    
     const errorMsg = error.response?.data?.detail || "Erro ao executar ordem.";
     alert(errorMsg);
   } finally {
@@ -82,23 +67,34 @@ export default function OrderForm({ onOrderSuccess }: { onOrderSuccess: () => vo
   }
 };
   const orderTotal = (parseFloat(price) || 0) * (parseFloat(quantity) || 0);
+
   return (
     <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 mb-8">
       <h2 className="text-lg font-bold text-slate-800 mb-4">Nova Ordem de Negociação</h2>
       <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
         
-        {/* Selecao do Ativo */}
+        {/* Input de Texto Dinâmico com Botão de Busca */}
         <div>
-          <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Ativo</label>
-          <select 
-            required
-            value={assetId}
-            onChange={(e) => setAssetId(e.target.value)}
-            className="w-full p-2 border rounded-md bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none"
-          >
-            <option value="">Selecione...</option>
-            {assets.map(a => <option key={a.id} value={a.id}>{a.ticker} - {a.name}</option>)}
-          </select>
+          <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Ativo (Ticker)</label>
+          <div className="flex gap-2">
+            <input 
+              type="text" 
+              required 
+              value={ticker} 
+              onChange={(e) => setTicker(e.target.value.toUpperCase())}
+              placeholder="Ex: VALE3.SA"
+              className="w-full p-2 border rounded-md bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none uppercase"
+            />
+            <button 
+              type="button" 
+              onClick={handleSearchPrice}
+              disabled={searchingPrice || !ticker}
+              className="bg-slate-200 text-slate-700 px-3 rounded-md hover:bg-slate-300 disabled:opacity-50 text-xs font-bold transition-colors"
+              title="Buscar Preço Atual"
+            >
+              {searchingPrice ? '...' : 'BUSCAR'}
+            </button>
+          </div>
         </div>
 
         {/* Tipo: Compra ou Venda */}
@@ -122,8 +118,8 @@ export default function OrderForm({ onOrderSuccess }: { onOrderSuccess: () => vo
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Quantidade</label>
           <input 
-            type="number" required value={quantity} onChange={(e) => setQuantity(e.target.value)}
-            className="w-full p-2 border rounded-md bg-gray-50 outline-none" placeholder="0"
+            type="number" required min="0.01" step="0.01" value={quantity} onChange={(e) => setQuantity(e.target.value)}
+            className="w-full p-2 border rounded-md bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="0"
           />
         </div>
 
@@ -138,11 +134,11 @@ export default function OrderForm({ onOrderSuccess }: { onOrderSuccess: () => vo
             className={`w-full p-2 border rounded-md outline-none cursor-not-allowed ${
               price === 'Buscando...' ? 'bg-yellow-50 text-yellow-600 animate-pulse' : 'bg-gray-100 text-gray-700 font-semibold'
             }`} 
-            placeholder="Selecione um ativo..."
+            placeholder="Clique em BUSCAR"
           />
         </div>
 
-          {/* AREA DE RESUMO E ACAO --- */}
+        {/* AREA DE RESUMO E ACAO */}
         <div className="flex flex-col justify-end w-full">
           <div className="flex justify-between items-end mb-1 px-1 h-4">
             <span className="text-[10px] font-bold text-gray-400 uppercase">Total</span>
@@ -152,12 +148,13 @@ export default function OrderForm({ onOrderSuccess }: { onOrderSuccess: () => vo
           </div>
           
           <button 
-            disabled={loading}
+            type="submit"
+            disabled={loading || !price || isNaN(parseFloat(price))}
             className={`w-full py-2 rounded-md font-bold text-white transition-all shadow-sm ${
               type === 'compra' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-orange-600 hover:bg-orange-700'
             } disabled:opacity-50`}
           >
-            {loading ? 'Process...' : 'Executar'}
+            {loading ? 'Processando...' : 'Executar'}
           </button>
         </div>
       </form>

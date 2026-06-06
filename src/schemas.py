@@ -1,7 +1,8 @@
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
 from datetime import datetime
 from typing import List, Optional
 from models import TransactionType
+import models
 
 class AssetBase(BaseModel):
     ticker: str = Field(..., example="PETR4", description="Código de negociação do ativo")
@@ -35,12 +36,15 @@ class TransactionBase(BaseModel):
     quantity: float = Field(..., gt=0, description="Quantidade negociada")
     price: float = Field(..., gt=0, description="Preço unitário do ativo na negociação")
 
-class TransactionCreate(TransactionBase):
-    asset_id: int
+class TransactionCreate(BaseModel):
+    ticker: str
+    type: models.TransactionType
+    quantity: float
+    price: float
 
 class TransactionResponse(BaseModel):
     id: int
-    type: str # 'BUY' ou 'SELL'
+    type: models.TransactionType # 'BUY' ou 'SELL'
     quantity: float
     price: float
     asset_id: int

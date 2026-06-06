@@ -8,8 +8,8 @@ from database import Base
 Base = declarative_base()
 
 class TransactionType(enum.Enum):
-    BUY = "compra"
-    SELL = "venda"
+    BUY = "BUY"
+    SELL = "SELL"
 
 class User(Base):
     __tablename__ = "users"
