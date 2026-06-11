@@ -118,7 +118,12 @@ export default function OrderForm({ onOrderSuccess }: { onOrderSuccess: () => vo
         <div>
           <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Quantidade</label>
           <input 
-            type="number" required min="0.01" step="0.01" value={quantity} onChange={(e) => setQuantity(e.target.value)}
+            type="number" 
+            required 
+            min="1" 
+            step="1" 
+            value={quantity} 
+            onChange={(e) => setQuantity(e.target.value)}
             className="w-full p-2 border rounded-md bg-gray-50 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="0"
           />
         </div>
